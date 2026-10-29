@@ -1,0 +1,24 @@
+{
+  "name": "medicore-hospital-rms",
+  "version": "1.0.0",
+  "description": "Resource Allocation and Management System for Multi-Speciality Hospitals",
+  "scripts": {
+    "seed": "npm run prisma:seed --prefix backend",
+    "test": "npm test --prefix backend",
+    "server": "npm run dev --prefix backend",
+    "client": "npm run dev --prefix frontend",
+    "build:client": "npm run build --prefix frontend"
+  },
+  "keywords": [
+    "hospital",
+    "resource-management",
+    "healthcare",
+    "react",
+    "node",
+    "express",
+    "prisma",
+    "mysql"
+  ],
+  "author": "MediCore System Architecture Team",
+  "license": "ISC"
+}

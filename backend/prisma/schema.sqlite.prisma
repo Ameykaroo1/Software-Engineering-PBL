@@ -1,0 +1,143 @@
+// Prisma schema for MediCore Hospital Resource Management System (SQLite for automated testing & standalone execution)
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  userID       String    @id @default(uuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         String    // HOSPITAL_ADMINISTRATOR, RECEPTION_STAFF, DEPARTMENT_COORDINATOR, SYSTEM_ADMINISTRATOR
+  departmentID String?
+  department   Department? @relation(fields: [departmentID], references: [departmentID], onDelete: SetNull)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  allocations     Allocation[]
+  statusHistories StatusHistory[]
+  auditLogs       AuditLog[]
+  reports         UtilizationReport[]
+
+  @@index([role])
+  @@index([departmentID])
+}
+
+model Department {
+  departmentID   String   @id @default(uuid())
+  departmentName String   @unique
+  code           String   @unique
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users       User[]
+  resources   Resource[]
+  allocations Allocation[]
+}
+
+model Resource {
+  resourceID        String         @id @default(uuid())
+  resourceName      String
+  resourceType      String         // HOSPITAL_BED, OPERATION_THEATRE, MEDICAL_EQUIPMENT, AMBULANCE, DIAGNOSTIC_FACILITY
+  subType           String         // ICU, General Ward, MRI, Ventilator, ALS, etc.
+  departmentID      String
+  department        Department     @relation(fields: [departmentID], references: [departmentID], onDelete: Restrict)
+  location          String
+  status            String         @default("AVAILABLE") // AVAILABLE, ALLOCATED, IN_USE, CLEANING_MAINTENANCE, OUT_OF_SERVICE, UNDER_REPAIR, RETIRED_DISPOSED
+  quantityTotal     Int            @default(1)
+  quantityAvailable Int            @default(1)
+  identifierCode    String         @unique
+  specifications    String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  retiredAt         DateTime?
+
+  allocations     Allocation[]
+  statusHistories StatusHistory[]
+
+  @@index([resourceType])
+  @@index([status])
+  @@index([departmentID])
+}
+
+model Allocation {
+  allocationID     String           @id @default(uuid())
+  resourceID       String
+  resource         Resource         @relation(fields: [resourceID], references: [resourceID], onDelete: Restrict)
+  userID           String
+  user             User             @relation(fields: [userID], references: [userID], onDelete: Restrict)
+  departmentID     String
+  department       Department       @relation(fields: [departmentID], references: [departmentID], onDelete: Restrict)
+  patientReference String?
+  purpose          String
+  priority         String           @default("NORMAL") // NORMAL, URGENT, EMERGENCY
+  startTime        DateTime
+  expectedEndTime  DateTime?
+  actualEndTime    DateTime?
+  quantity         Int              @default(1)
+  status           String           @default("ALLOCATED") // REQUESTED, ALLOCATED, IN_USE, RELEASED, REJECTED, CANCELLED
+  notes            String?
+  isEmergency      Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([resourceID])
+  @@index([userID])
+  @@index([departmentID])
+  @@index([status])
+}
+
+model StatusHistory {
+  historyID      String         @id @default(uuid())
+  resourceID     String
+  resource       Resource       @relation(fields: [resourceID], references: [resourceID], onDelete: Cascade)
+  previousStatus String
+  newStatus      String
+  changedBy      String
+  user           User           @relation(fields: [changedBy], references: [userID], onDelete: Restrict)
+  reason         String
+  timestamp      DateTime       @default(now())
+
+  @@index([resourceID])
+  @@index([changedBy])
+}
+
+model AuditLog {
+  auditID    String   @id @default(uuid())
+  userID     String?
+  user       User?    @relation(fields: [userID], references: [userID], onDelete: SetNull)
+  action     String
+  entityType String
+  entityID   String
+  details    String?
+  ipAddress  String?
+  timestamp  DateTime @default(now())
+
+  @@index([userID])
+  @@index([action])
+  @@index([entityType])
+  @@index([timestamp])
+}
+
+model UtilizationReport {
+  reportID    String   @id @default(uuid())
+  reportType  String
+  generatedBy String
+  user        User     @relation(fields: [generatedBy], references: [userID], onDelete: Restrict)
+  startDate   DateTime
+  endDate     DateTime
+  summaryData String
+  generatedAt DateTime @default(now())
+
+  @@index([generatedBy])
+  @@index([reportType])
+}

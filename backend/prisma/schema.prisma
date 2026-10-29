@@ -1,0 +1,183 @@
+// Prisma schema for MediCore Hospital Resource Management System (MySQL)
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  HOSPITAL_ADMINISTRATOR
+  RECEPTION_STAFF
+  DEPARTMENT_COORDINATOR
+  SYSTEM_ADMINISTRATOR
+}
+
+enum ResourceType {
+  HOSPITAL_BED
+  OPERATION_THEATRE
+  MEDICAL_EQUIPMENT
+  AMBULANCE
+  DIAGNOSTIC_FACILITY
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  ALLOCATED
+  IN_USE
+  CLEANING_MAINTENANCE
+  OUT_OF_SERVICE
+  UNDER_REPAIR
+  RETIRED_DISPOSED
+}
+
+enum AllocationStatus {
+  REQUESTED
+  ALLOCATED
+  IN_USE
+  RELEASED
+  REJECTED
+  CANCELLED
+}
+
+enum Priority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+model User {
+  userID       String    @id @default(uuid())
+  username     String    @unique @db.VarChar(100)
+  email        String    @unique @db.VarChar(191)
+  passwordHash String    @db.VarChar(255)
+  fullName     String    @db.VarChar(191)
+  role         Role
+  departmentID String?   @db.VarChar(36)
+  department   Department? @relation(fields: [departmentID], references: [departmentID], onDelete: SetNull)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  allocations     Allocation[]
+  statusHistories StatusHistory[]
+  auditLogs       AuditLog[]
+  reports         UtilizationReport[]
+
+  @@index([role])
+  @@index([departmentID])
+}
+
+model Department {
+  departmentID   String   @id @default(uuid())
+  departmentName String   @unique @db.VarChar(191)
+  code           String   @unique @db.VarChar(50)
+  description    String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users       User[]
+  resources   Resource[]
+  allocations Allocation[]
+}
+
+model Resource {
+  resourceID        String         @id @default(uuid())
+  resourceName      String         @db.VarChar(191)
+  resourceType      ResourceType
+  subType           String         @db.VarChar(100)
+  departmentID      String         @db.VarChar(36)
+  department        Department     @relation(fields: [departmentID], references: [departmentID], onDelete: Restrict)
+  location          String         @db.VarChar(191)
+  status            ResourceStatus @default(AVAILABLE)
+  quantityTotal     Int            @default(1)
+  quantityAvailable Int            @default(1)
+  identifierCode    String         @unique @db.VarChar(100)
+  specifications    String?        @db.Text
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  retiredAt         DateTime?
+
+  allocations     Allocation[]
+  statusHistories StatusHistory[]
+
+  @@index([resourceType])
+  @@index([status])
+  @@index([departmentID])
+}
+
+model Allocation {
+  allocationID     String           @id @default(uuid())
+  resourceID       String           @db.VarChar(36)
+  resource         Resource         @relation(fields: [resourceID], references: [resourceID], onDelete: Restrict)
+  userID           String           @db.VarChar(36)
+  user             User             @relation(fields: [userID], references: [userID], onDelete: Restrict)
+  departmentID     String           @db.VarChar(36)
+  department       Department       @relation(fields: [departmentID], references: [departmentID], onDelete: Restrict)
+  patientReference String?          @db.VarChar(191)
+  purpose          String           @db.VarChar(255)
+  priority         Priority         @default(NORMAL)
+  startTime        DateTime
+  expectedEndTime  DateTime?
+  actualEndTime    DateTime?
+  quantity         Int              @default(1)
+  status           AllocationStatus @default(ALLOCATED)
+  notes            String?          @db.Text
+  isEmergency      Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([resourceID])
+  @@index([userID])
+  @@index([departmentID])
+  @@index([status])
+}
+
+model StatusHistory {
+  historyID      String         @id @default(uuid())
+  resourceID     String         @db.VarChar(36)
+  resource       Resource       @relation(fields: [resourceID], references: [resourceID], onDelete: Cascade)
+  previousStatus ResourceStatus
+  newStatus      ResourceStatus
+  changedBy      String         @db.VarChar(36)
+  user           User           @relation(fields: [changedBy], references: [userID], onDelete: Restrict)
+  reason         String         @db.VarChar(255)
+  timestamp      DateTime       @default(now())
+
+  @@index([resourceID])
+  @@index([changedBy])
+}
+
+model AuditLog {
+  auditID    String   @id @default(uuid())
+  userID     String?  @db.VarChar(36)
+  user       User?    @relation(fields: [userID], references: [userID], onDelete: SetNull)
+  action     String   @db.VarChar(100)
+  entityType String   @db.VarChar(50)
+  entityID   String   @db.VarChar(36)
+  details    String?  @db.Text
+  ipAddress  String?  @db.VarChar(50)
+  timestamp  DateTime @default(now())
+
+  @@index([userID])
+  @@index([action])
+  @@index([entityType])
+  @@index([timestamp])
+}
+
+model UtilizationReport {
+  reportID    String   @id @default(uuid())
+  reportType  String   @db.VarChar(50)
+  generatedBy String   @db.VarChar(36)
+  user        User     @relation(fields: [generatedBy], references: [userID], onDelete: Restrict)
+  startDate   DateTime
+  endDate     DateTime
+  summaryData String   @db.Text
+  generatedAt DateTime @default(now())
+
+  @@index([generatedBy])
+  @@index([reportType])
+}
